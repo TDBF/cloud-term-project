@@ -115,6 +115,7 @@ def delete_instance(ec2, instance_id):
     except Exception as e:
         print(f"Error terminating instance {instance_id}: {str(e)}")
 
+
 # Main menu
 def main():
     ec2 = init()
