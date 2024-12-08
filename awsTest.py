@@ -98,6 +98,15 @@ def list_images(ec2, image_name):
             print(f"[ImageID] {image['ImageId']}, [Name] {image['Name']}, [Owner] {image['OwnerId']}")
     except Exception as e:
         print(f"Error listing images: {str(e)}")
+        
+# Terminate EC2 Instance
+def delete_instance(ec2, instance_id):
+    print(f"Terminating instance {instance_id}...")
+    try:
+        response = ec2.terminate_instances(InstanceIds=[instance_id])
+        print(f"Successfully terminated instance {instance_id}.")
+    except Exception as e:
+        print(f"Error terminating instance {instance_id}: {str(e)}")
 
 # Main menu
 def main():
@@ -111,6 +120,7 @@ def main():
         print("  3. Start instance              4. Available regions       ")
         print("  5. Stop instance               6. Create instance         ")
         print("  7. Reboot instance             8. List images             ")
+        print("  9. Delete instance                                          ")
         print("                                99. Quit                    ")
         print("------------------------------------------------------------")
         
@@ -141,6 +151,9 @@ def main():
         elif choice == 8:
             image_name = input("Enter image name filter: ").strip()
             list_images(ec2, image_name)
+        elif choice == 9:
+            instance_id = input("Enter instance ID: ").strip()
+            delete_instance(ec2, instance_id)
         elif choice == 99:
             print("Goodbye!")
             break
