@@ -20,7 +20,14 @@ def list_instances(ec2):
         response = ec2.describe_instances()
         for reservation in response['Reservations']:
             for instance in reservation['Instances']:
-                print(f"[ID] {instance['InstanceId']}, [AMI] {instance['ImageId']}, "
+                # Extract instance name from tags
+                name = "N/A"
+                if 'Tags' in instance:
+                    for tag in instance['Tags']:
+                        if tag['Key'] == 'Name':
+                            name = tag['Value']
+                            break
+                print(f"[ID] {instance['InstanceId']}, [Name] {name}, [AMI] {instance['ImageId']}, "
                       f"[Type] {instance['InstanceType']}, [State] {instance['State']['Name']}, "
                       f"[Monitoring State] {instance['Monitoring']['State']}")
     except Exception as e:
@@ -98,7 +105,7 @@ def list_images(ec2, image_name):
             print(f"[ImageID] {image['ImageId']}, [Name] {image['Name']}, [Owner] {image['OwnerId']}")
     except Exception as e:
         print(f"Error listing images: {str(e)}")
-        
+
 # Terminate EC2 Instance
 def delete_instance(ec2, instance_id):
     print(f"Terminating instance {instance_id}...")
