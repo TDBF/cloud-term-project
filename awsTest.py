@@ -1,17 +1,50 @@
 import boto3
-from botocore.exceptions import NoCredentialsError, PartialCredentialsError
+import json
 import sys
+import os
+from botocore.exceptions import NoCredentialsError, PartialCredentialsError
+
+# Load AWS credentials from a file
+def load_credentials():
+    try:
+        # Use the same directory as the script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        credentials_path = os.path.join(script_dir, "credentials.json")
+        
+        # Open and parse the credentials.json file
+        with open(credentials_path, 'r') as file:
+            credentials = json.load(file)
+        return (
+            credentials['aws_access_key_id'], 
+            credentials['aws_secret_access_key'], 
+            credentials.get('region', 'ap-northeast-2'), 
+            credentials.get('default_ami_id')  # Optional AMI ID
+        )
+    except FileNotFoundError:
+        print(f"Error: Credentials file '{credentials_path}' not found.")
+        sys.exit(1)
+    except KeyError as e:
+        print(f"Error: Missing key {str(e)} in credentials file.")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print("Error: Invalid JSON format in credentials file.")
+        sys.exit(1)
 
 # AWS Session Initialization
 def init():
+    aws_access_key_id, aws_secret_access_key, region, _ = load_credentials()
     try:
-        # Initialize session with default profile
-        session = boto3.Session(profile_name='default', region_name='ap-northeast-2')
+        session = boto3.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            region_name=region
+        )
         ec2 = session.client('ec2')
         return ec2
     except (NoCredentialsError, PartialCredentialsError) as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
+
 
 # List EC2 Instances
 def list_instances(ec2):
@@ -20,7 +53,6 @@ def list_instances(ec2):
         response = ec2.describe_instances()
         for reservation in response['Reservations']:
             for instance in reservation['Instances']:
-                # Extract instance name from tags
                 name = "N/A"
                 if 'Tags' in instance:
                     for tag in instance['Tags']:
@@ -48,7 +80,7 @@ def available_zones(ec2):
 def start_instance(ec2, instance_id):
     print(f"Starting instance {instance_id}...")
     try:
-        response = ec2.start_instances(InstanceIds=[instance_id])
+        ec2.start_instances(InstanceIds=[instance_id])
         print(f"Successfully started instance {instance_id}.")
     except Exception as e:
         print(f"Error starting instance {instance_id}: {str(e)}")
@@ -67,13 +99,18 @@ def available_regions(ec2):
 def stop_instance(ec2, instance_id):
     print(f"Stopping instance {instance_id}...")
     try:
-        response = ec2.stop_instances(InstanceIds=[instance_id])
+        ec2.stop_instances(InstanceIds=[instance_id])
         print(f"Successfully stopped instance {instance_id}.")
     except Exception as e:
         print(f"Error stopping instance {instance_id}: {str(e)}")
 
 # Create EC2 Instance
-def create_instance(ec2, ami_id):
+def create_instance(ec2):
+    _, _, _, ami_id = load_credentials()
+    if not ami_id:
+        print("Error: No default AMI ID found in credentials.json.")
+        return
+    
     print(f"Creating instance with AMI {ami_id}...")
     try:
         response = ec2.run_instances(
@@ -110,11 +147,10 @@ def list_images(ec2, image_name):
 def delete_instance(ec2, instance_id):
     print(f"Terminating instance {instance_id}...")
     try:
-        response = ec2.terminate_instances(InstanceIds=[instance_id])
+        ec2.terminate_instances(InstanceIds=[instance_id])
         print(f"Successfully terminated instance {instance_id}.")
     except Exception as e:
         print(f"Error terminating instance {instance_id}: {str(e)}")
-
 
 # Main menu
 def main():
@@ -151,8 +187,7 @@ def main():
             instance_id = input("Enter instance ID: ").strip()
             stop_instance(ec2, instance_id)
         elif choice == 6:
-            ami_id = input("Enter AMI ID: ").strip()
-            create_instance(ec2, ami_id)
+            create_instance(ec2)  # No input needed for AMI ID
         elif choice == 7:
             instance_id = input("Enter instance ID: ").strip()
             reboot_instance(ec2, instance_id)
