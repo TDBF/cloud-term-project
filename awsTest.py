@@ -154,23 +154,32 @@ def stop_instance(ec2):
             except Exception as e:
                 print(f"Error stopping instance {instance_id}: {str(e)}")
 
-# Create EC2 Instance
+# Create EC2 Instance with Name Tag
 def create_instance(ec2):
     _, _, _, ami_id = load_credentials()
     if not ami_id:
         print("Error: No default AMI ID found in credentials.json.")
         return
-    
-    print(f"Creating instance with AMI {ami_id}...")
+
+    instance_name = input("Enter a name for the instance: ").strip()
+    print(f"Creating instance with AMI {ami_id} and name '{instance_name}'...")
     try:
         response = ec2.run_instances(
             ImageId=ami_id,
             InstanceType='t2.micro',
             MinCount=1,
-            MaxCount=1
+            MaxCount=1,
+            TagSpecifications=[
+                {
+                    'ResourceType': 'instance',
+                    'Tags': [
+                        {'Key': 'Name', 'Value': instance_name}
+                    ]
+                }
+            ]
         )
         instance_id = response['Instances'][0]['InstanceId']
-        print(f"Successfully created instance {instance_id} with AMI {ami_id}.")
+        print(f"Successfully created instance {instance_id} with name '{instance_name}' and AMI {ami_id}.")
     except Exception as e:
         print(f"Error creating instance: {str(e)}")
 
