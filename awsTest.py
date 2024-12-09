@@ -2,6 +2,7 @@ import boto3
 import json
 import sys
 import os
+import subprocess
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 
 # Load AWS credentials from a file
@@ -244,6 +245,49 @@ def delete_instance(ec2):
             except Exception as e:
                 print(f"Error terminating instance {instance_id}: {str(e)}")
 
+
+# SSH access to an instance
+def ssh_to_instance(ec2):
+    instances = list_instances_with_choice(ec2)
+    if not instances:
+        print("No instances available for SSH access.")
+        return
+
+    instance_id = select_instance(instances)
+    if not instance_id:
+        print("No instance selected. Operation canceled.")
+        return
+
+    try:
+        response = ec2.describe_instances(InstanceIds=[instance_id])
+        instance = response['Reservations'][0]['Instances'][0]
+        public_ip = instance.get('PublicIpAddress')
+
+        if not public_ip:
+            print(f"Instance {instance_id} does not have a public IP address.")
+            return
+
+        print(f"Selected instance {instance_id} with public IP: {public_ip}")
+        key_path = input("Enter the path to your private key file (.pem): ").strip()
+        if not os.path.exists(key_path):
+            print(f"Key file {key_path} does not exist.")
+            return
+
+        ssh_command = f"ssh -i {key_path} ec2-user@{public_ip}"
+        print(f"To SSH into the instance, the following command will be executed:")
+        print(ssh_command)
+        
+        run_ssh = input("Do you want to execute this SSH command now? (y/n): ").strip().lower()
+        if run_ssh == "y":
+            try:
+                subprocess.run(ssh_command, shell=True, check=True)
+                print("SSH connection established successfully.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing SSH command: {e}")
+    except Exception as e:
+        print(f"Error retrieving instance details: {str(e)}")
+
+
 # Main menu
 def main():
     ec2 = init()
@@ -257,7 +301,7 @@ def main():
         print("  5. Stop instance               6. Create instance         ")
         print("  7. Reboot instance             8. List all images         ")
         print("  9. Delete instance             10. Update name tag        ")
-        print("                                 99. Quit                   ")
+        print("  11. SSH to instance            99. Quit                   ")
         print("------------------------------------------------------------")
         
         choice = input("Enter an integer: ")
@@ -287,6 +331,8 @@ def main():
             delete_instance(ec2)
         elif choice == 10:
             update_instance_name(ec2)
+        elif choice == 11:
+            ssh_to_instance(ec2)
         elif choice == 99:
             print("Goodbye!")
             break
