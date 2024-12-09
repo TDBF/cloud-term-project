@@ -42,7 +42,7 @@ def init():
         print(f"Error: {str(e)}")
         sys.exit(1)
 
-# List EC2 Instances with numbered choices
+# List EC2 Instances with detailed information
 def list_instances_with_choice(ec2):
     print("Listing instances...")
     instances = []
@@ -56,14 +56,22 @@ def list_instances_with_choice(ec2):
                         if tag['Key'] == 'Name':
                             name = tag['Value']
                             break
-                instances.append({
+                instance_details = {
                     'InstanceId': instance['InstanceId'],
                     'Name': name,
-                    'State': instance['State']['Name']
-                })
+                    'State': instance['State']['Name'],
+                    'Type': instance.get('InstanceType', 'N/A'),
+                    'PublicIP': instance.get('PublicIpAddress', 'N/A'),
+                    'PrivateIP': instance.get('PrivateIpAddress', 'N/A'),
+                    'Zone': instance['Placement']['AvailabilityZone']
+                }
+                instances.append(instance_details)
+        
         if instances:
+            print(f"{'No.':<5}{'Instance ID':<20}{'Name':<20}{'State':<15}{'Type':<15}{'Public IP':<20}{'Private IP':<15}{'Zone'}")
+            print("-" * 115)
             for idx, inst in enumerate(instances, 1):
-                print(f"{idx}. [ID] {inst['InstanceId']}, [Name] {inst['Name']}, [State] {inst['State']}")
+                print(f"{idx:<5}{inst['InstanceId']:<20}{inst['Name']:<20}{inst['State']:<15}{inst['Type']:<15}{inst['PublicIP']:<20}{inst['PrivateIP']:<15}{inst['Zone']}")
             return instances
         else:
             print("No instances found.")
