@@ -219,12 +219,16 @@ def reboot_instance(ec2):
             except Exception as e:
                 print(f"Error rebooting instance {instance_id}: {str(e)}")
 
-def list_images(ec2, image_name):
-    print("Listing images...")
+def list_images(ec2):
+    print("Listing all images...")
     try:
-        response = ec2.describe_images(Filters=[{'Name': 'name', 'Values': [image_name]}])
+        response = ec2.describe_images(Owners=['self'])
+        if not response['Images']:
+            print("No images found.")
+            return
+
         for image in response['Images']:
-            print(f"[ImageID] {image['ImageId']}, [Name] {image['Name']}, [Owner] {image['OwnerId']}")
+            print(f"[ImageID] {image['ImageId']}, [Name] {image.get('Name', 'N/A')}, [Owner] {image['OwnerId']}")
     except Exception as e:
         print(f"Error listing images: {str(e)}")
 
@@ -251,9 +255,9 @@ def main():
         print("  1. List instances              2. Available zones         ")
         print("  3. Start instance              4. Available regions       ")
         print("  5. Stop instance               6. Create instance         ")
-        print("  7. Reboot instance             8. List images             ")
+        print("  7. Reboot instance             8. List all images         ")
         print("  9. Delete instance             10. Update name tag        ")
-        print("                                99. Quit                    ")
+        print("                                 99. Quit                   ")
         print("------------------------------------------------------------")
         
         choice = input("Enter an integer: ")
