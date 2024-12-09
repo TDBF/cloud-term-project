@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import boto3
 import json
 import sys
@@ -38,7 +39,8 @@ def init():
             region_name=region
         )
         ec2 = session.client('ec2')
-        return ec2
+        cloudwatch = session.client('cloudwatch')  # Initialize CloudWatch client
+        return ec2, cloudwatch
     except (NoCredentialsError, PartialCredentialsError) as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
@@ -362,10 +364,55 @@ def execute_condor_status_on_instances(ec2):
     except Exception as e:
         print(f"Error retrieving instance details or executing command: {str(e)}")
 
+def get_cpu_usage(ec2, cloudwatch):
+    instances = list_instances_with_choice(ec2)
+    if not instances:
+        print("No instances available.")
+        return
+
+    instance_id = select_instance(instances)
+    if not instance_id:
+        print("No instance selected. Operation canceled.")
+        return
+
+    try:
+        # Get CPU usage metrics from CloudWatch
+        response = cloudwatch.get_metric_data(
+            MetricDataQueries=[
+                {
+                    'Id': 'cpuUsage',
+                    'MetricStat': {
+                        'Metric': {
+                            'Namespace': 'AWS/EC2',
+                            'MetricName': 'CPUUtilization',
+                            'Dimensions': [
+                                {'Name': 'InstanceId', 'Value': instance_id}
+                            ]
+                        },
+                        'Period': 300,  # 5 minutes
+                        'Stat': 'Average'
+                    },
+                    'ReturnData': True
+                }
+            ],
+            StartTime=datetime.utcnow() - timedelta(hours=1),  # Last 1 hour
+            EndTime=datetime.utcnow()
+        )
+
+        print(f"CPU usage for instance {instance_id} in the last hour:")
+        for result in response['MetricDataResults']:
+            if result['Values']:
+                for timestamp, value in zip(result['Timestamps'], result['Values']):
+                    print(f"Time: {timestamp}, CPU Utilization: {value}%")
+            else:
+                print("No CPU usage data available for the selected instance.")
+    except Exception as e:
+        print(f"Error fetching CPU usage data: {str(e)}")
+
 
 # Main menu
 def main():
-    ec2 = init()
+    ec2, cloudwatch = init()
 
     while True:
         print("\n------------------------------------------------------------")
@@ -377,7 +424,7 @@ def main():
         print("  7.  Reboot instance             8.  List all images        ")
         print("  9.  Delete instance             10. Update name tag        ")
         print("  11. SSH to instance             12. Execute condor_status  ")
-        print("                                  99. Quit                   ")
+        print("  13. View CPU usage              99. Quit                   ")
         print("------------------------------------------------------------")
         
         choice = input("Enter an integer: ")
@@ -411,6 +458,8 @@ def main():
             ssh_to_instance(ec2)
         elif choice == 12:
             execute_condor_status_on_instances(ec2)
+        elif choice == 13:
+            get_cpu_usage(ec2, cloudwatch)
         elif choice == 99:
             print("Goodbye!")
             break
