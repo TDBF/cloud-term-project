@@ -3,6 +3,7 @@ import json
 import sys
 import os
 import subprocess
+import paramiko
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 
 # Load AWS credentials from a file
@@ -296,6 +297,66 @@ def ssh_to_instance(ec2):
         print(f"Error retrieving instance details: {str(e)}")
 
 
+# Execute condor_status on selected instances
+def execute_condor_status_on_instances(ec2):
+    instances = list_instances_with_choice(ec2)
+    if not instances:
+        print("No instances available.")
+        return
+
+    instance_id = select_instance(instances)
+    if not instance_id:
+        print("No instance selected. Operation canceled.")
+        return
+
+    try:
+        response = ec2.describe_instances(InstanceIds=[instance_id])
+        instance = response['Reservations'][0]['Instances'][0]
+        public_ip = instance.get('PublicIpAddress')
+
+        if not public_ip:
+            print(f"Instance {instance_id} does not have a public IP address.")
+            return
+
+        print(f"Selected instance {instance_id} with public IP: {public_ip}")
+        key_path = input("Enter the path to your private key file (.pem): ").strip()
+        if not os.path.exists(key_path):
+            print(f"Key file {key_path} does not exist.")
+            return
+
+        # SSH connection
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            ssh.connect(
+                hostname=public_ip,
+                username="ec2-user",  # Update if using a different default username
+                key_filename=key_path
+            )
+            print("Connected successfully. Executing condor_status...")
+            
+            # Execute condor_status
+            stdin, stdout, stderr = ssh.exec_command("condor_status")
+            output = stdout.read().decode()
+            error = stderr.read().decode()
+            
+            if output:
+                print("\nOutput of condor_status command:\n")
+                print(output)
+            if error:
+                print("\nError output of condor_status command:\n")
+                print(error)
+
+        except paramiko.AuthenticationException:
+            print("Authentication failed. Please check your private key and username.")
+        except paramiko.SSHException as e:
+            print(f"SSH connection error: {e}")
+        finally:
+            ssh.close()
+    except Exception as e:
+        print(f"Error retrieving instance details or executing command: {str(e)}")
+
+
 # Main menu
 def main():
     ec2 = init()
@@ -304,12 +365,13 @@ def main():
         print("\n------------------------------------------------------------")
         print("           Amazon AWS Control Panel using SDK               ")
         print("------------------------------------------------------------")
-        print("  1. List instances              2. Available zones         ")
-        print("  3. Start instance              4. Available regions       ")
-        print("  5. Stop instance               6. Create instance         ")
-        print("  7. Reboot instance             8. List all images         ")
-        print("  9. Delete instance             10. Update name tag        ")
-        print("  11. SSH to instance            99. Quit                   ")
+        print("  1.  List instances              2.  Available zones        ")
+        print("  3.  Start instance              4.  Available regions      ")
+        print("  5.  Stop instance               6.  Create instance        ")
+        print("  7.  Reboot instance             8.  List all images        ")
+        print("  9.  Delete instance             10. Update name tag        ")
+        print("  11. SSH to instance             12. Execute condor_status  ")
+        print("                                  99. Quit                   ")
         print("------------------------------------------------------------")
         
         choice = input("Enter an integer: ")
@@ -341,6 +403,8 @@ def main():
             update_instance_name(ec2)
         elif choice == 11:
             ssh_to_instance(ec2)
+        elif choice == 12:
+            execute_condor_status_on_instances(ec2)
         elif choice == 99:
             print("Goodbye!")
             break
