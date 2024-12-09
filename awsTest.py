@@ -126,11 +126,11 @@ def list_and_select_ami(ec2):
         print(f"Error listing AMIs: {str(e)}")
         return None
 
-# Create a new EC2 instance
+# Create a new EC2 instance with a specified security group
 def create_instance(ec2):
-    ami_id = list_and_select_ami(ec2)
+    _, _, _, ami_id = load_credentials()
     if not ami_id:
-        print("No AMI selected. Instance creation canceled.")
+        print("Error: No default AMI ID found in credentials.json.")
         return
 
     instance_name = input("Enter a name for the instance: ").strip()
@@ -138,21 +138,28 @@ def create_instance(ec2):
         print("Invalid instance name. Operation canceled.")
         return
 
+    security_group_id = "sg-0d9d4b03a4fe1cd2b"  # Specify the security group ID
+
     try:
+        print(f"Creating an instance with security group {security_group_id}...")
         response = ec2.run_instances(
             ImageId=ami_id,
             InstanceType='t2.micro',
             MinCount=1,
             MaxCount=1,
-            TagSpecifications=[{
-                'ResourceType': 'instance',
-                'Tags': [{'Key': 'Name', 'Value': instance_name}]
-            }]
+            SecurityGroupIds=[security_group_id],  # Assign the security group
+            TagSpecifications=[
+                {
+                    'ResourceType': 'instance',
+                    'Tags': [{'Key': 'Name', 'Value': instance_name}]
+                }
+            ]
         )
         instance_id = response['Instances'][0]['InstanceId']
         print(f"Successfully created instance {instance_id} with name '{instance_name}'.")
     except Exception as e:
         print(f"Error creating instance: {str(e)}")
+
 
 # Update the name tag of an EC2 instance
 def update_instance_name(ec2):
