@@ -128,9 +128,9 @@ def list_and_select_ami(ec2):
 
 # Create a new EC2 instance with a specified security group
 def create_instance(ec2):
-    _, _, _, ami_id = load_credentials()
+    ami_id = list_and_select_ami(ec2)
     if not ami_id:
-        print("Error: No default AMI ID found in credentials.json.")
+        print("No AMI selected. Instance creation canceled.")
         return
 
     instance_name = input("Enter a name for the instance: ").strip()
@@ -138,7 +138,8 @@ def create_instance(ec2):
         print("Invalid instance name. Operation canceled.")
         return
 
-    security_group_id = "sg-0d9d4b03a4fe1cd2b"  # Specify the security group ID
+    # 지정할 보안 그룹 ID
+    security_group_id = "sg-0d9d4b03a4fe1cd2b"
 
     try:
         print(f"Creating an instance with security group {security_group_id}...")
@@ -147,13 +148,11 @@ def create_instance(ec2):
             InstanceType='t2.micro',
             MinCount=1,
             MaxCount=1,
-            SecurityGroupIds=[security_group_id],  # Assign the security group
-            TagSpecifications=[
-                {
-                    'ResourceType': 'instance',
-                    'Tags': [{'Key': 'Name', 'Value': instance_name}]
-                }
-            ]
+            SecurityGroupIds=[security_group_id],  # 보안 그룹 설정
+            TagSpecifications=[{
+                'ResourceType': 'instance',
+                'Tags': [{'Key': 'Name', 'Value': instance_name}]
+            }]
         )
         instance_id = response['Instances'][0]['InstanceId']
         print(f"Successfully created instance {instance_id} with name '{instance_name}'.")
